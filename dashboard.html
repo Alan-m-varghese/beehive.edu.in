@@ -1,0 +1,3074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bee Hive - Learning Platform</title>
+  
+  <!-- React and ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #root {
+      width: 100%;
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function BeeHivePlatform() {
+      const [currentPage, setCurrentPage] = useState('landing');
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [isLoaded, setIsLoaded] = useState(false);
+      const [selectedCourse, setSelectedCourse] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [filterCategory, setFilterCategory] = useState('all');
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [currentUser, setCurrentUser] = useState(null);
+      const [authError, setAuthError] = useState('');
+
+      // Check if user is logged in on component mount
+      useEffect(() => {
+        setIsLoaded(true);
+        const loggedInUser = localStorage.getItem('beeHiveUser');
+        if (loggedInUser) {
+          setCurrentUser(JSON.parse(loggedInUser));
+          setIsAuthenticated(true);
+        }
+      }, []);
+
+      // Authentication functions
+      const handleSignUp = (name, email, password, confirmPassword) => {
+        setAuthError('');
+        
+        // Validation
+        if (!name || !email || !password || !confirmPassword) {
+          setAuthError('All fields are required');
+          return false;
+        }
+
+        if (password.length < 6) {
+          setAuthError('Password must be at least 6 characters');
+          return false;
+        }
+
+        if (password !== confirmPassword) {
+          setAuthError('Passwords do not match');
+          return false;
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          setAuthError('Please enter a valid email');
+          return false;
+        }
+
+        // Check if user already exists
+        const existingUsers = JSON.parse(localStorage.getItem('beeHiveUsers') || '[]');
+        const userExists = existingUsers.find(u => u.email === email);
+        
+        if (userExists) {
+          setAuthError('Email already registered. Please sign in.');
+          return false;
+        }
+
+        // Create new user
+        const newUser = {
+          id: Date.now(),
+          name,
+          email,
+          password, // In production, this should be hashed on the server
+          createdAt: new Date().toISOString()
+        };
+
+        // Save to localStorage
+        existingUsers.push(newUser);
+        localStorage.setItem('beeHiveUsers', JSON.stringify(existingUsers));
+        
+        // Log the user in
+        const userSession = { id: newUser.id, name: newUser.name, email: newUser.email };
+        localStorage.setItem('beeHiveUser', JSON.stringify(userSession));
+        setCurrentUser(userSession);
+        setIsAuthenticated(true);
+        setCurrentPage('dashboard');
+        
+        return true;
+      };
+
+      const handleSignIn = (email, password) => {
+        setAuthError('');
+        
+        // Validation
+        if (!email || !password) {
+          setAuthError('Email and password are required');
+          return false;
+        }
+
+        // Get users from localStorage
+        const existingUsers = JSON.parse(localStorage.getItem('beeHiveUsers') || '[]');
+        const user = existingUsers.find(u => u.email === email && u.password === password);
+        
+        if (!user) {
+          setAuthError('Invalid email or password');
+          return false;
+        }
+
+        // Log the user in
+        const userSession = { id: user.id, name: user.name, email: user.email };
+        localStorage.setItem('beeHiveUser', JSON.stringify(userSession));
+        setCurrentUser(userSession);
+        setIsAuthenticated(true);
+        setCurrentPage('dashboard');
+        
+        return true;
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem('beeHiveUser');
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setCurrentPage('landing');
+      };
+
+      // Protect dashboard and other authenticated pages
+      const requireAuth = (page) => {
+        if (!isAuthenticated) {
+          setAuthError('Please sign in to access this page');
+          setCurrentPage('signin');
+          return false;
+        }
+        setCurrentPage(page);
+        return true;
+      };
+
+      const HoneycombPattern = () => (
+        <svg className="honeycomb-pattern" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style={{ stopColor: '#FFD700', stopOpacity: 1 }} />
+              <stop offset="100%" style={{ stopColor: '#FFA500', stopOpacity: 1 }} />
+            </linearGradient>
+          </defs>
+          {[0, 1, 2, 3].map(row => 
+            [0, 1, 2, 3].map(col => {
+              const x = col * 70 + (row % 2) * 35 + 50;
+              const y = row * 60 + 50;
+              return (
+                <polygon
+                  key={`${row}-${col}`}
+                  points={`${x},${y-30} ${x+25},${y-15} ${x+25},${y+15} ${x},${y+30} ${x-25},${y+15} ${x-25},${y-15}`}
+                  fill="none"
+                  stroke="url(#goldGradient)"
+                  strokeWidth="2.5"
+                  opacity="0.8"
+                  style={{
+                    animation: `pulse ${2 + Math.random() * 2}s ease-in-out infinite`,
+                    animationDelay: `${Math.random() * 2}s`
+                  }}
+                />
+              );
+            })
+          )}
+        </svg>
+      );
+
+      const Navigation = () => (
+        <nav className="navbar">
+          <div className="nav-container">
+            {!isAuthenticated && (
+              <button 
+                className="nav-link" 
+                onClick={() => setCurrentPage('signin')}
+              >
+                Sign In
+              </button>
+            )}
+            <button 
+              className="nav-link" 
+              onClick={() => setCurrentPage('features')}
+            >
+              Features
+            </button>
+            <button 
+              className="nav-link" 
+              onClick={() => setCurrentPage('services')}
+            >
+              Services
+            </button>
+            <button 
+              className="brand" 
+              onClick={() => setCurrentPage('landing')}
+            >
+              Bee Hive
+            </button>
+            <button 
+              className="nav-link" 
+              onClick={() => setCurrentPage('prices')}
+            >
+              Prices
+            </button>
+            <button 
+              className="nav-link" 
+              onClick={() => setCurrentPage('about')}
+            >
+              About Us
+            </button>
+            {isAuthenticated ? (
+              <button 
+                className="nav-link nav-link-signup" 
+                onClick={() => setCurrentPage('dashboard')}
+              >
+                Dashboard
+              </button>
+            ) : (
+              <button 
+                className="nav-link nav-link-signup" 
+                onClick={() => setCurrentPage('signup')}
+              >
+                Sign Up
+              </button>
+            )}
+          </div>
+        </nav>
+      );
+
+      const LandingPage = () => (
+        <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+          <Navigation />
+          <div className="landing-content">
+            <div className="hero-section">
+              <h1 className="hero-title">
+                Turn your screen time<br />
+                into skill time.
+              </h1>
+              <button className="cta-button" onClick={() => setCurrentPage(isAuthenticated ? 'dashboard' : 'signup')}>
+                {isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
+              </button>
+              <div className="stats">
+                <div className="stat-item">
+                  <div className="stat-number">100+</div>
+                  <div className="stat-label">courses</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-number">900+</div>
+                  <div className="stat-label">Hours of digital</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-number">10+</div>
+                  <div className="stat-label">Verified Tutors</div>
+                </div>
+              </div>
+            </div>
+            <HoneycombPattern />
+          </div>
+        </div>
+      );
+
+      const ServicesPage = () => (
+        <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+          <Navigation />
+          <div className="services-content">
+            <h2 className="section-title">Services</h2>
+            <div className="services-grid">
+              <button className="service-card">Courses</button>
+              <button className="service-card">Assessments</button>
+              <button className="service-card">Study materials</button>
+              <button className="service-card">Exams</button>
+              <button className="service-card">Community</button>
+              <button className="service-card">Personal Assist</button>
+            </div>
+            <div className="motto">
+              <span className="motto-text">INNOVATE</span>
+              <span className="motto-icon">⚡</span>
+              <span className="motto-text">INSPIRE</span>
+              <span className="motto-icon">⚡</span>
+              <span className="motto-text">CREATE</span>
+            </div>
+          </div>
+        </div>
+      );
+
+      const FeaturesPage = () => (
+        <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+          <Navigation />
+          <div className="features-content">
+            <h2 className="section-title">Features</h2>
+            <div className="features-grid">
+              <div className="feature-card">
+                <h3 className="feature-title">Smarter learning Experience</h3>
+                <ul className="feature-list">
+                  <li>● Personalized Learning Paths</li>
+                  <li>● Bite-Sized Microlearning</li>
+                  <li>● Interactive Quizzes & Projects</li>
+                </ul>
+              </div>
+              <div className="feature-card">
+                <h3 className="feature-title">Ultimate Convenience</h3>
+                <ul className="feature-list">
+                  <li>● Offline Mode</li>
+                  <li>● Seamless Cross-Device Sync</li>
+                  <li>● Audio Only Mode</li>
+                </ul>
+              </div>
+              <div className="feature-card">
+                <h3 className="feature-title">Motivation & Achievement</h3>
+                <ul className="feature-list">
+                  <li>● Verifiable Certificates</li>
+                  <li>● Gamified Progress Tracking</li>
+                  <li>● Goal Reminders & Nudges</li>
+                </ul>
+              </div>
+              <div className="feature-card">
+                <h3 className="feature-title">Community Support</h3>
+                <ul className="feature-list">
+                  <li>● Learn from Industry Experts</li>
+                  <li>● Interactive Discussion Boards</li>
+                  <li>● 1-on-1 Networking (Premium Feature)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      const SignUpPage = () => {
+        const [formData, setFormData] = useState({
+          name: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        });
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          handleSignUp(formData.name, formData.email, formData.password, formData.confirmPassword);
+        };
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <Navigation />
+            <div className="auth-content">
+              <form className="auth-form" onSubmit={handleSubmit}>
+                <h2 className="auth-title">Sign Up</h2>
+                {authError && <div className="auth-error">{authError}</div>}
+                <input 
+                  type="text" 
+                  placeholder="Enter Name" 
+                  className="auth-input"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                />
+                <input 
+                  type="email" 
+                  placeholder="Enter email" 
+                  className="auth-input"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                />
+                <input 
+                  type="password" 
+                  placeholder="Enter password (min 6 characters)" 
+                  className="auth-input"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                />
+                <input 
+                  type="password" 
+                  placeholder="Confirm password" 
+                  className="auth-input"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                />
+                <button type="submit" className="auth-button">Create Account</button>
+                <p className="auth-link">
+                  Already have an account? 
+                  <button type="button" onClick={() => setCurrentPage('signin')} className="link-button">
+                    Sign In
+                  </button>
+                </p>
+              </form>
+              <HoneycombPattern />
+            </div>
+          </div>
+        );
+      };
+
+      const SignInPage = () => {
+        const [formData, setFormData] = useState({
+          email: '',
+          password: ''
+        });
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          handleSignIn(formData.email, formData.password);
+        };
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <Navigation />
+            <div className="auth-content">
+              <form className="auth-form" onSubmit={handleSubmit}>
+                <h2 className="auth-title">Sign In</h2>
+                {authError && <div className="auth-error">{authError}</div>}
+                <input 
+                  type="email" 
+                  placeholder="Enter email" 
+                  className="auth-input"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                />
+                <input 
+                  type="password" 
+                  placeholder="Enter password" 
+                  className="auth-input"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                />
+                <button type="submit" className="auth-button">Sign In</button>
+                <p className="auth-link">
+                  Don't have an account? 
+                  <button type="button" onClick={() => setCurrentPage('signup')} className="link-button">
+                    Sign Up
+                  </button>
+                </p>
+              </form>
+              <HoneycombPattern />
+            </div>
+          </div>
+        );
+      };
+
+      const DashboardPage = () => {
+        // Redirect to sign in if not authenticated
+        if (!isAuthenticated) {
+          setCurrentPage('signin');
+          return null;
+        }
+
+        const courses = [
+          {
+            id: 1,
+            title: "Web Development Masterclass",
+            instructor: "Sarah Johnson",
+            progress: 65,
+            thumbnail: "🌐",
+            category: "Development",
+            duration: "12 hours",
+            enrolled: true
+          },
+          {
+            id: 2,
+            title: "Python for Data Science",
+            instructor: "Mike Chen",
+            progress: 40,
+            thumbnail: "🐍",
+            category: "Data Science",
+            duration: "15 hours",
+            enrolled: true
+          },
+          {
+            id: 3,
+            title: "UI/UX Design Fundamentals",
+            instructor: "Emma Davis",
+            progress: 85,
+            thumbnail: "🎨",
+            category: "Design",
+            duration: "8 hours",
+            enrolled: true
+          },
+          {
+            id: 4,
+            title: "Machine Learning A-Z",
+            instructor: "Dr. James Wilson",
+            progress: 0,
+            thumbnail: "🤖",
+            category: "AI & ML",
+            duration: "20 hours",
+            enrolled: false
+          },
+          {
+            id: 5,
+            title: "Digital Marketing Strategy",
+            instructor: "Lisa Anderson",
+            progress: 0,
+            thumbnail: "📱",
+            category: "Marketing",
+            duration: "10 hours",
+            enrolled: false
+          },
+          {
+            id: 6,
+            title: "Mobile App Development",
+            instructor: "Ryan Taylor",
+            progress: 0,
+            thumbnail: "📲",
+            category: "Development",
+            duration: "18 hours",
+            enrolled: false
+          }
+        ];
+
+        const enrolledCourses = courses.filter(c => c.enrolled);
+        const availableCourses = courses.filter(c => !c.enrolled);
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <nav className="navbar dashboard-nav">
+              <div className="nav-container">
+                <button className="brand" onClick={() => setCurrentPage('landing')}>
+                  Bee Hive
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>
+                  Dashboard
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>My Courses</button>
+                <button className="nav-link">Community</button>
+                <button className="nav-link" onClick={() => setCurrentPage('certificates')}>
+                  Certificates
+                </button>
+                <button className="nav-link user-profile" onClick={() => setCurrentPage('profile')}>
+                  <span className="user-avatar">👤</span>
+                  {currentUser?.name || 'Profile'}
+                </button>
+                <button className="nav-link logout-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            </nav>
+
+            <div className="dashboard-content">
+              <div className="dashboard-header">
+                <div className="welcome-section">
+                  <h1 className="dashboard-title">Welcome back, {currentUser?.name || 'Learner'}! 👋</h1>
+                  <p className="dashboard-subtitle">Continue your learning journey</p>
+                </div>
+                <div className="dashboard-stats-mini">
+                  <div className="mini-stat">
+                    <div className="mini-stat-icon">📚</div>
+                    <div className="mini-stat-info">
+                      <div className="mini-stat-value">3</div>
+                      <div className="mini-stat-label">Active Courses</div>
+                    </div>
+                  </div>
+                  <div className="mini-stat">
+                    <div className="mini-stat-icon">🏆</div>
+                    <div className="mini-stat-info">
+                      <div className="mini-stat-value">2</div>
+                      <div className="mini-stat-label">Certificates</div>
+                    </div>
+                  </div>
+                  <div className="mini-stat">
+                    <div className="mini-stat-icon">⚡</div>
+                    <div className="mini-stat-info">
+                      <div className="mini-stat-value">15</div>
+                      <div className="mini-stat-label">Day Streak</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="search-filter-section">
+                <div className="search-box">
+                  <span className="search-icon">🔍</span>
+                  <input 
+                    type="text" 
+                    placeholder="Search courses..." 
+                    className="search-input"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="filter-buttons">
+                  <button 
+                    className={`filter-btn ${filterCategory === 'all' ? 'active' : ''}`}
+                    onClick={() => setFilterCategory('all')}
+                  >
+                    All
+                  </button>
+                  <button 
+                    className={`filter-btn ${filterCategory === 'Development' ? 'active' : ''}`}
+                    onClick={() => setFilterCategory('Development')}
+                  >
+                    Development
+                  </button>
+                  <button 
+                    className={`filter-btn ${filterCategory === 'Design' ? 'active' : ''}`}
+                    onClick={() => setFilterCategory('Design')}
+                  >
+                    Design
+                  </button>
+                  <button 
+                    className={`filter-btn ${filterCategory === 'Data Science' ? 'active' : ''}`}
+                    onClick={() => setFilterCategory('Data Science')}
+                  >
+                    Data Science
+                  </button>
+                  <button 
+                    className={`filter-btn ${filterCategory === 'Marketing' ? 'active' : ''}`}
+                    onClick={() => setFilterCategory('Marketing')}
+                  >
+                    Marketing
+                  </button>
+                </div>
+              </div>
+
+              <section className="dashboard-section">
+                <h2 className="section-heading">Continue Learning</h2>
+                <div className="courses-grid">
+                  {enrolledCourses
+                    .filter(course => 
+                      (filterCategory === 'all' || course.category === filterCategory) &&
+                      (searchQuery === '' || course.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                    )
+                    .map(course => (
+                    <div key={course.id} className="course-card">
+                      <div className="course-thumbnail">{course.thumbnail}</div>
+                      <div className="course-info">
+                        <div className="course-category">{course.category}</div>
+                        <h3 className="course-title">{course.title}</h3>
+                        <p className="course-instructor">by {course.instructor}</p>
+                        <div className="course-progress-section">
+                          <div className="progress-bar-container">
+                            <div className="progress-bar" style={{ width: `${course.progress}%` }}></div>
+                          </div>
+                          <span className="progress-text">{course.progress}% Complete</span>
+                        </div>
+                        <div className="course-actions">
+                          <button 
+                            className="btn-primary"
+                            onClick={() => {
+                              setSelectedCourse(course);
+                              setCurrentPage('course-player');
+                            }}
+                          >
+                            Continue
+                          </button>
+                          <button className="btn-secondary">Details</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="dashboard-section">
+                <h2 className="section-heading">Recommended Courses</h2>
+                <div className="courses-grid">
+                  {availableCourses
+                    .filter(course => 
+                      (filterCategory === 'all' || course.category === filterCategory) &&
+                      (searchQuery === '' || course.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                    )
+                    .map(course => (
+                    <div key={course.id} className="course-card">
+                      <div className="course-thumbnail">{course.thumbnail}</div>
+                      <div className="course-info">
+                        <div className="course-category">{course.category}</div>
+                        <h3 className="course-title">{course.title}</h3>
+                        <p className="course-instructor">by {course.instructor}</p>
+                        <div className="course-meta">
+                          <span className="course-duration">⏱️ {course.duration}</span>
+                        </div>
+                        <div className="course-actions">
+                          <button className="btn-primary">Enroll Now</button>
+                          <button className="btn-secondary">Preview</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="dashboard-section">
+                <h2 className="section-heading">Your Achievements</h2>
+                <div className="achievements-grid">
+                  <div className="achievement-card">
+                    <div className="achievement-icon">🎯</div>
+                    <h3 className="achievement-title">First Course Complete</h3>
+                    <p className="achievement-desc">Completed your first course</p>
+                  </div>
+                  <div className="achievement-card">
+                    <div className="achievement-icon">🔥</div>
+                    <h3 className="achievement-title">15 Day Streak</h3>
+                    <p className="achievement-desc">Learning consistently for 15 days</p>
+                  </div>
+                  <div className="achievement-card locked">
+                    <div className="achievement-icon">🌟</div>
+                    <h3 className="achievement-title">Power Learner</h3>
+                    <p className="achievement-desc">Complete 5 courses to unlock</p>
+                  </div>
+                  <div className="achievement-card locked">
+                    <div className="achievement-icon">👑</div>
+                    <h3 className="achievement-title">Master Achiever</h3>
+                    <p className="achievement-desc">Complete 10 courses to unlock</p>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        );
+      };
+
+      const CoursePlayerPage = () => {
+        // Redirect to sign in if not authenticated
+        if (!isAuthenticated) {
+          setCurrentPage('signin');
+          return null;
+        }
+
+        if (!selectedCourse) {
+          setCurrentPage('dashboard');
+          return null;
+        }
+
+        const lessons = [
+          { id: 1, title: "Introduction to the Course", duration: "5:30", completed: true },
+          { id: 2, title: "Getting Started", duration: "12:45", completed: true },
+          { id: 3, title: "Core Concepts", duration: "18:20", completed: true, current: true },
+          { id: 4, title: "Advanced Techniques", duration: "22:15", completed: false },
+          { id: 5, title: "Best Practices", duration: "15:40", completed: false },
+          { id: 6, title: "Real-World Projects", duration: "25:30", completed: false },
+          { id: 7, title: "Final Assessment", duration: "10:00", completed: false }
+        ];
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <nav className="navbar dashboard-nav">
+              <div className="nav-container">
+                <button className="brand" onClick={() => setCurrentPage('dashboard')}>
+                  Bee Hive
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>
+                  ← Back to Dashboard
+                </button>
+              </div>
+            </nav>
+
+            <div className="course-player-layout">
+              <div className="video-section">
+                <div className="video-player">
+                  <div className="video-placeholder">
+                    <div className="play-button">▶</div>
+                    <p>Video Player</p>
+                  </div>
+                </div>
+                <div className="video-info">
+                  <div className="course-category">{selectedCourse.category}</div>
+                  <h1 className="video-title">{selectedCourse.title}</h1>
+                  <p className="video-instructor">by {selectedCourse.instructor}</p>
+                  <div className="video-tabs">
+                    <button className="video-tab active">Overview</button>
+                    <button className="video-tab">Resources</button>
+                    <button className="video-tab">Q&A</button>
+                    <button className="video-tab">Notes</button>
+                  </div>
+                  <div className="video-description">
+                    <h3>About this lesson</h3>
+                    <p>
+                      In this comprehensive lesson, you'll learn the fundamental concepts and practical applications 
+                      of {selectedCourse.title}. We'll cover essential techniques, best practices, and real-world 
+                      examples that you can apply immediately to your projects.
+                    </p>
+                    <h3>What you'll learn</h3>
+                    <ul className="learning-objectives">
+                      <li>✓ Master the core concepts and principles</li>
+                      <li>✓ Apply techniques to real-world scenarios</li>
+                      <li>✓ Build practical projects from scratch</li>
+                      <li>✓ Develop industry-standard skills</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="curriculum-sidebar">
+                <div className="curriculum-header">
+                  <h3>Course Curriculum</h3>
+                  <div className="curriculum-progress">
+                    <span>{selectedCourse.progress}% Complete</span>
+                    <div className="progress-bar-container">
+                      <div className="progress-bar" style={{ width: `${selectedCourse.progress}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="lessons-list">
+                  {lessons.map((lesson, index) => (
+                    <div 
+                      key={lesson.id} 
+                      className={`lesson-item ${lesson.completed ? 'completed' : ''} ${lesson.current ? 'current' : ''}`}
+                    >
+                      <div className="lesson-number">{index + 1}</div>
+                      <div className="lesson-details">
+                        <div className="lesson-title">{lesson.title}</div>
+                        <div className="lesson-duration">{lesson.duration}</div>
+                      </div>
+                      <div className="lesson-status">
+                        {lesson.completed ? '✓' : lesson.current ? '▶' : '○'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="curriculum-actions">
+                  <button className="btn-primary">Mark as Complete</button>
+                  <button className="btn-secondary">Next Lesson →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const ProfilePage = () => {
+        // Redirect to sign in if not authenticated
+        if (!isAuthenticated) {
+          setCurrentPage('signin');
+          return null;
+        }
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <nav className="navbar dashboard-nav">
+              <div className="nav-container">
+                <button className="brand" onClick={() => setCurrentPage('landing')}>
+                  Bee Hive
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>
+                  Dashboard
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>My Courses</button>
+                <button className="nav-link">Community</button>
+                <button className="nav-link" onClick={() => setCurrentPage('certificates')}>
+                  Certificates
+                </button>
+                <button className="nav-link user-profile active" onClick={() => setCurrentPage('profile')}>
+                  <span className="user-avatar">👤</span>
+                  {currentUser?.name || 'Profile'}
+                </button>
+                <button className="nav-link logout-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            </nav>
+
+            <div className="profile-content">
+              <h2 className="section-title">Profile & Settings</h2>
+              
+              <div className="profile-grid">
+                <div className="profile-card">
+                  <h3 className="profile-section-title">Personal Information</h3>
+                  <div className="profile-avatar-section">
+                    <div className="profile-avatar-large">👤</div>
+                    <button className="btn-secondary">Change Avatar</button>
+                  </div>
+                  <div className="form-group">
+                    <label>Full Name</label>
+                    <input type="text" className="form-input" defaultValue={currentUser?.name || ''} />
+                  </div>
+                  <div className="form-group">
+                    <label>Email Address</label>
+                    <input type="email" className="form-input" defaultValue={currentUser?.email || ''} />
+                  </div>
+                  <div className="form-group">
+                    <label>Bio</label>
+                    <textarea className="form-textarea" rows="3" defaultValue="Passionate learner exploring new skills and technologies."></textarea>
+                  </div>
+                  <button className="btn-primary">Save Changes</button>
+                </div>
+
+                <div className="profile-card">
+                  <h3 className="profile-section-title">Learning Preferences</h3>
+                  <div className="form-group">
+                    <label>Daily Learning Goal</label>
+                    <select className="form-input">
+                      <option>30 minutes</option>
+                      <option>1 hour</option>
+                      <option selected>2 hours</option>
+                      <option>3+ hours</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Preferred Categories</label>
+                    <div className="checkbox-group">
+                      <label className="checkbox-label">
+                        <input type="checkbox" defaultChecked /> Development
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" defaultChecked /> Design
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" /> Data Science
+                      </label>
+                      <label className="checkbox-label">
+                        <input type="checkbox" /> Marketing
+                      </label>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="toggle-label">
+                      <input type="checkbox" defaultChecked />
+                      <span>Email notifications for new courses</span>
+                    </label>
+                    <label className="toggle-label">
+                      <input type="checkbox" defaultChecked />
+                      <span>Daily learning reminders</span>
+                    </label>
+                    <label className="toggle-label">
+                      <input type="checkbox" />
+                      <span>Weekly progress reports</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="profile-card">
+                  <h3 className="profile-section-title">Account Statistics</h3>
+                  <div className="stats-grid">
+                    <div className="stat-box">
+                      <div className="stat-icon">📚</div>
+                      <div className="stat-value">3</div>
+                      <div className="stat-label">Courses Enrolled</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon">✅</div>
+                      <div className="stat-value">8</div>
+                      <div className="stat-label">Completed Lessons</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon">⏱️</div>
+                      <div className="stat-value">24h</div>
+                      <div className="stat-label">Total Watch Time</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon">🔥</div>
+                      <div className="stat-value">15</div>
+                      <div className="stat-label">Day Streak</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profile-card">
+                  <h3 className="profile-section-title">Account Security</h3>
+                  <div className="form-group">
+                    <label>Current Password</label>
+                    <input type="password" className="form-input" placeholder="Enter current password" />
+                  </div>
+                  <div className="form-group">
+                    <label>New Password</label>
+                    <input type="password" className="form-input" placeholder="Enter new password" />
+                  </div>
+                  <div className="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" className="form-input" placeholder="Confirm new password" />
+                  </div>
+                  <button className="btn-primary">Update Password</button>
+                  <button className="btn-danger">Delete Account</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const CertificatesPage = () => {
+        // Redirect to sign in if not authenticated
+        if (!isAuthenticated) {
+          setCurrentPage('signin');
+          return null;
+        }
+
+        const certificates = [
+          {
+            id: 1,
+            course: "Web Development Masterclass",
+            issueDate: "January 15, 2026",
+            instructor: "Sarah Johnson",
+            credentialId: "BH-WDM-2026-001234"
+          },
+          {
+            id: 2,
+            course: "UI/UX Design Fundamentals",
+            issueDate: "February 8, 2026",
+            instructor: "Emma Davis",
+            credentialId: "BH-UXD-2026-005678"
+          }
+        ];
+
+        return (
+          <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+            <nav className="navbar dashboard-nav">
+              <div className="nav-container">
+                <button className="brand" onClick={() => setCurrentPage('landing')}>
+                  Bee Hive
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>
+                  Dashboard
+                </button>
+                <button className="nav-link" onClick={() => setCurrentPage('dashboard')}>My Courses</button>
+                <button className="nav-link">Community</button>
+                <button className="nav-link active" onClick={() => setCurrentPage('certificates')}>
+                  Certificates
+                </button>
+                <button className="nav-link user-profile" onClick={() => setCurrentPage('profile')}>
+                  <span className="user-avatar">👤</span>
+                  {currentUser?.name || 'Profile'}
+                </button>
+                <button className="nav-link logout-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            </nav>
+
+            <div className="certificates-content">
+              <h2 className="section-title">My Certificates</h2>
+              <p className="certificates-subtitle">
+                Download and share your verified certificates of completion
+              </p>
+
+              <div className="certificates-grid">
+                {certificates.map(cert => (
+                  <div key={cert.id} className="certificate-card">
+                    <div className="certificate-badge">
+                      <div className="badge-icon">🏆</div>
+                    </div>
+                    <div className="certificate-content">
+                      <h3 className="certificate-course">{cert.course}</h3>
+                      <p className="certificate-instructor">Instructor: {cert.instructor}</p>
+                      <p className="certificate-date">Issued: {cert.issueDate}</p>
+                      <p className="certificate-id">Credential ID: {cert.credentialId}</p>
+                    </div>
+                    <div className="certificate-actions">
+                      <button className="btn-primary">Download PDF</button>
+                      <button className="btn-secondary">Share</button>
+                      <button className="btn-secondary">Verify</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="certificates-empty">
+                <div className="empty-icon">📜</div>
+                <h3>Complete more courses to earn certificates!</h3>
+                <p>Finish your enrolled courses to receive verified certificates of completion.</p>
+                <button className="btn-primary" onClick={() => setCurrentPage('dashboard')}>
+                  Browse Courses
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const PricesPage = () => (
+        <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+          <Navigation />
+          <div className="prices-content">
+            <h2 className="section-title">Choose Your Plan</h2>
+            <p className="prices-subtitle">Unlock your potential with the perfect learning plan</p>
+            
+            <div className="pricing-grid">
+              <div className="pricing-card">
+                <div className="pricing-header">
+                  <h3 className="pricing-tier">Starter</h3>
+                  <div className="pricing-amount">
+                    <span className="currency">$</span>
+                    <span className="price">0</span>
+                    <span className="period">/month</span>
+                  </div>
+                </div>
+                <ul className="pricing-features">
+                  <li>✓ Access to 10 free courses</li>
+                  <li>✓ Basic quizzes & assessments</li>
+                  <li>✓ Community forum access</li>
+                  <li>✓ Mobile & web access</li>
+                  <li>✗ Certificates</li>
+                  <li>✗ Offline mode</li>
+                  <li>✗ Personal mentor</li>
+                </ul>
+                <button className="pricing-button pricing-button-starter">Get Started</button>
+              </div>
+
+              <div className="pricing-card pricing-card-featured">
+                <div className="featured-badge">MOST POPULAR</div>
+                <div className="pricing-header">
+                  <h3 className="pricing-tier">Pro</h3>
+                  <div className="pricing-amount">
+                    <span className="currency">$</span>
+                    <span className="price">29</span>
+                    <span className="period">/month</span>
+                  </div>
+                </div>
+                <ul className="pricing-features">
+                  <li>✓ Unlimited course access</li>
+                  <li>✓ Advanced assessments & projects</li>
+                  <li>✓ Verified certificates</li>
+                  <li>✓ Offline mode</li>
+                  <li>✓ Priority support</li>
+                  <li>✓ Gamified progress tracking</li>
+                  <li>✗ 1-on-1 mentoring</li>
+                </ul>
+                <button className="pricing-button pricing-button-pro">Upgrade to Pro</button>
+              </div>
+
+              <div className="pricing-card">
+                <div className="pricing-header">
+                  <h3 className="pricing-tier">Enterprise</h3>
+                  <div className="pricing-amount">
+                    <span className="currency">$</span>
+                    <span className="price">99</span>
+                    <span className="period">/month</span>
+                  </div>
+                </div>
+                <ul className="pricing-features">
+                  <li>✓ Everything in Pro</li>
+                  <li>✓ 1-on-1 mentor sessions</li>
+                  <li>✓ Custom learning paths</li>
+                  <li>✓ Team collaboration tools</li>
+                  <li>✓ API access</li>
+                  <li>✓ White-label options</li>
+                  <li>✓ Dedicated account manager</li>
+                </ul>
+                <button className="pricing-button pricing-button-enterprise">Contact Sales</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      const AboutUsPage = () => (
+        <div className={`page ${isLoaded ? 'loaded' : ''}`}>
+          <Navigation />
+          <div className="about-content">
+            <div className="about-hero">
+              <h2 className="section-title">About Bee Hive</h2>
+              <p className="about-tagline">Building the future of online learning, one skill at a time.</p>
+            </div>
+
+            <div className="about-section">
+              <div className="about-text">
+                <h3 className="about-heading">Our Mission</h3>
+                <p className="about-paragraph">
+                  At Bee Hive, we believe that learning should be as natural as a bee collecting nectar. 
+                  We're on a mission to transform idle screen time into productive skill-building moments. 
+                  Our platform brings together expert tutors, cutting-edge technology, and a vibrant community 
+                  to create an unparalleled learning experience.
+                </p>
+              </div>
+              <HoneycombPattern />
+            </div>
+
+            <div className="values-section">
+              <h3 className="about-heading">Our Core Values</h3>
+              <div className="values-grid">
+                <div className="value-card">
+                  <div className="value-icon">🎯</div>
+                  <h4 className="value-title">Excellence</h4>
+                  <p className="value-description">
+                    We maintain the highest standards in course quality, ensuring every learning 
+                    experience is valuable and impactful.
+                  </p>
+                </div>
+                <div className="value-card">
+                  <div className="value-icon">🤝</div>
+                  <h4 className="value-title">Community</h4>
+                  <p className="value-description">
+                    Learning is better together. We foster a supportive environment where 
+                    students and mentors collaborate and grow.
+                  </p>
+                </div>
+                <div className="value-card">
+                  <div className="value-icon">💡</div>
+                  <h4 className="value-title">Innovation</h4>
+                  <p className="value-description">
+                    We continuously evolve our platform with the latest technology to provide 
+                    the best learning tools and experiences.
+                  </p>
+                </div>
+                <div className="value-card">
+                  <div className="value-icon">🚀</div>
+                  <h4 className="value-title">Growth</h4>
+                  <p className="value-description">
+                    We're committed to helping every learner reach their full potential through 
+                    personalized paths and continuous support.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="stats-section">
+              <h3 className="about-heading">Our Impact</h3>
+              <div className="impact-stats">
+                <div className="impact-stat">
+                  <div className="impact-number">10,000+</div>
+                  <div className="impact-label">Active Learners</div>
+                </div>
+                <div className="impact-stat">
+                  <div className="impact-number">100+</div>
+                  <div className="impact-label">Expert Courses</div>
+                </div>
+                <div className="impact-stat">
+                  <div className="impact-number">50+</div>
+                  <div className="impact-label">Verified Tutors</div>
+                </div>
+                <div className="impact-stat">
+                  <div className="impact-number">95%</div>
+                  <div className="impact-label">Success Rate</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="cta-section">
+              <h3 className="cta-heading">Ready to Start Your Learning Journey?</h3>
+              <button className="cta-button" onClick={() => setCurrentPage('signup')}>
+                Join Bee Hive Today
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+
+      return (
+        <>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: 'Space Grotesk', -apple-system, sans-serif;
+              background: #0a0a0a;
+              color: #ffffff;
+              overflow-x: hidden;
+            }
+
+            .page {
+              min-height: 100vh;
+              background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+              position: relative;
+              opacity: 0;
+              animation: fadeIn 0.6s ease-out forwards;
+            }
+
+            .page.loaded {
+              opacity: 1;
+            }
+
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
+            @keyframes pulse {
+              0%, 100% {
+                opacity: 0.6;
+                transform: scale(1);
+              }
+              50% {
+                opacity: 1;
+                transform: scale(1.05);
+              }
+            }
+
+            .navbar {
+              width: 100%;
+              padding: 1.5rem 2rem;
+              position: relative;
+              z-index: 100;
+            }
+
+            .nav-container {
+              max-width: 1400px;
+              margin: 0 auto;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 2rem;
+              flex-wrap: wrap;
+            }
+
+            .nav-link {
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 0.7rem 1.8rem;
+              border-radius: 25px;
+              font-size: 0.95rem;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              backdrop-filter: blur(10px);
+              letter-spacing: 0.3px;
+            }
+
+            .nav-link:hover {
+              background: rgba(255, 215, 0, 0.15);
+              border-color: rgba(255, 215, 0, 0.3);
+              transform: translateY(-2px);
+              box-shadow: 0 4px 20px rgba(255, 215, 0, 0.2);
+            }
+
+            .nav-link-signup {
+              background: rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .brand {
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border: none;
+              color: #0a0a0a;
+              padding: 0.7rem 2.5rem;
+              border-radius: 25px;
+              font-size: 1.1rem;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+              box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
+            }
+
+            .brand:hover {
+              transform: translateY(-3px) scale(1.05);
+              box-shadow: 0 6px 30px rgba(255, 215, 0, 0.5);
+            }
+
+            /* Landing Page */
+            .landing-content {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+              min-height: calc(100vh - 100px);
+              gap: 4rem;
+            }
+
+            .hero-section {
+              flex: 1;
+              max-width: 600px;
+              animation: slideInLeft 0.8s ease-out;
+            }
+
+            @keyframes slideInLeft {
+              from {
+                opacity: 0;
+                transform: translateX(-50px);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+
+            .hero-title {
+              font-family: 'Orbitron', monospace;
+              font-size: 3.5rem;
+              font-weight: 900;
+              line-height: 1.2;
+              margin-bottom: 2.5rem;
+              background: linear-gradient(135deg, #ffffff 0%, #FFD700 100%);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+              animation: textGlow 3s ease-in-out infinite;
+            }
+
+            @keyframes textGlow {
+              0%, 100% {
+                filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
+              }
+              50% {
+                filter: drop-shadow(0 0 40px rgba(255, 215, 0, 0.6));
+              }
+            }
+
+            .cta-button {
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border: none;
+              color: #0a0a0a;
+              padding: 1rem 3rem;
+              border-radius: 30px;
+              font-size: 1.1rem;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.4);
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+
+            .cta-button:hover {
+              transform: translateY(-3px) scale(1.05);
+              box-shadow: 0 12px 40px rgba(255, 215, 0, 0.6);
+            }
+
+            .stats {
+              display: flex;
+              gap: 3rem;
+              margin-top: 4rem;
+            }
+
+            .stat-item {
+              text-align: center;
+              animation: fadeInUp 0.8s ease-out forwards;
+              opacity: 0;
+            }
+
+            .stat-item:nth-child(1) { animation-delay: 0.2s; }
+            .stat-item:nth-child(2) { animation-delay: 0.4s; }
+            .stat-item:nth-child(3) { animation-delay: 0.6s; }
+
+            @keyframes fadeInUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+
+            .stat-number {
+              font-size: 2rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.3rem;
+            }
+
+            .stat-label {
+              font-size: 0.9rem;
+              color: rgba(255, 255, 255, 0.7);
+            }
+
+            .honeycomb-pattern {
+              width: 400px;
+              height: 400px;
+              animation: float 6s ease-in-out infinite;
+            }
+
+            @keyframes float {
+              0%, 100% {
+                transform: translateY(0px) rotate(0deg);
+              }
+              50% {
+                transform: translateY(-20px) rotate(5deg);
+              }
+            }
+
+            /* Services Page */
+            .services-content {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+              text-align: center;
+            }
+
+            .section-title {
+              font-family: 'Orbitron', monospace;
+              font-size: 2.5rem;
+              font-weight: 700;
+              margin-bottom: 3rem;
+              color: #FFD700;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+            }
+
+            .services-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 1.5rem;
+              margin-bottom: 4rem;
+            }
+
+            .service-card {
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 2rem 1.5rem;
+              border-radius: 20px;
+              font-size: 1.1rem;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              backdrop-filter: blur(10px);
+            }
+
+            .service-card:hover {
+              background: rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.5);
+              transform: translateY(-5px);
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.3);
+            }
+
+            .motto {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              gap: 2rem;
+              font-size: 2rem;
+              font-weight: 700;
+              margin-top: 4rem;
+            }
+
+            .motto-text {
+              color: #ffffff;
+              letter-spacing: 3px;
+              font-family: 'Orbitron', monospace;
+            }
+
+            .motto-icon {
+              color: #FFD700;
+              font-size: 1.5rem;
+              animation: sparkle 2s ease-in-out infinite;
+            }
+
+            @keyframes sparkle {
+              0%, 100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.2) rotate(180deg);
+                opacity: 0.7;
+              }
+            }
+
+            /* Features Page */
+            .features-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+            }
+
+            .features-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 2rem;
+            }
+
+            .feature-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              padding: 2rem;
+              border-radius: 20px;
+              transition: all 0.3s ease;
+              backdrop-filter: blur(10px);
+            }
+
+            .feature-card:hover {
+              background: rgba(255, 215, 0, 0.05);
+              border-color: rgba(255, 215, 0, 0.3);
+              transform: translateY(-5px);
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.2);
+            }
+
+            .feature-title {
+              font-size: 1.3rem;
+              font-weight: 700;
+              margin-bottom: 1.5rem;
+              color: #FFD700;
+            }
+
+            .feature-list {
+              list-style: none;
+              text-align: left;
+            }
+
+            .feature-list li {
+              color: rgba(255, 255, 255, 0.8);
+              margin-bottom: 0.8rem;
+              font-size: 0.95rem;
+              line-height: 1.5;
+            }
+
+            /* Auth Pages */
+            .auth-content {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              max-width: 1200px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+              min-height: calc(100vh - 100px);
+              gap: 4rem;
+            }
+
+            .auth-form {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              padding: 3rem 2.5rem;
+              border-radius: 25px;
+              backdrop-filter: blur(20px);
+              max-width: 400px;
+              width: 100%;
+              box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+            }
+
+            .auth-title {
+              font-family: 'Orbitron', monospace;
+              font-size: 2rem;
+              font-weight: 700;
+              margin-bottom: 2rem;
+              color: #FFD700;
+              text-align: center;
+            }
+
+            .auth-input {
+              width: 100%;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 1rem 1.5rem;
+              border-radius: 15px;
+              font-size: 1rem;
+              margin-bottom: 1.2rem;
+              transition: all 0.3s ease;
+              font-family: 'Space Grotesk', sans-serif;
+            }
+
+            .auth-input::placeholder {
+              color: rgba(255, 255, 255, 0.4);
+            }
+
+            .auth-input:focus {
+              outline: none;
+              border-color: rgba(255, 215, 0, 0.5);
+              background: rgba(255, 255, 255, 0.08);
+              box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+            }
+
+            .auth-button {
+              width: 100%;
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border: none;
+              color: #0a0a0a;
+              padding: 1rem;
+              border-radius: 15px;
+              font-size: 1.1rem;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              margin-top: 1rem;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+
+            .auth-button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.5);
+            }
+
+            .auth-error {
+              background: rgba(255, 50, 50, 0.2);
+              border: 1px solid rgba(255, 50, 50, 0.5);
+              color: #ff5050;
+              padding: 0.8rem 1rem;
+              border-radius: 10px;
+              margin-bottom: 1.5rem;
+              text-align: center;
+              font-size: 0.9rem;
+            }
+
+            .auth-link {
+              text-align: center;
+              color: rgba(255, 255, 255, 0.7);
+              margin-top: 1.5rem;
+              font-size: 0.95rem;
+            }
+
+            .link-button {
+              background: none;
+              border: none;
+              color: #FFD700;
+              font-weight: 600;
+              cursor: pointer;
+              margin-left: 0.5rem;
+              text-decoration: underline;
+              font-size: 0.95rem;
+              font-family: 'Space Grotesk', sans-serif;
+            }
+
+            .link-button:hover {
+              color: #FFA500;
+            }
+
+            .logout-btn {
+              background: rgba(255, 50, 50, 0.1);
+              border-color: rgba(255, 50, 50, 0.3);
+            }
+
+            .logout-btn:hover {
+              background: rgba(255, 50, 50, 0.2);
+              border-color: rgba(255, 50, 50, 0.5);
+            }
+
+            /* Prices Page */
+            .prices-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+              text-align: center;
+            }
+
+            .prices-subtitle {
+              font-size: 1.2rem;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 4rem;
+            }
+
+            .pricing-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 2rem;
+              max-width: 1200px;
+              margin: 0 auto;
+            }
+
+            .pricing-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 2px solid rgba(255, 255, 255, 0.1);
+              padding: 3rem 2rem;
+              border-radius: 25px;
+              transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+              backdrop-filter: blur(10px);
+              position: relative;
+              overflow: hidden;
+            }
+
+            .pricing-card::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 4px;
+              background: linear-gradient(90deg, #FFD700, #FFA500);
+              opacity: 0;
+              transition: opacity 0.3s ease;
+            }
+
+            .pricing-card:hover {
+              transform: translateY(-10px);
+              border-color: rgba(255, 215, 0, 0.4);
+              box-shadow: 0 15px 50px rgba(255, 215, 0, 0.2);
+            }
+
+            .pricing-card:hover::before {
+              opacity: 1;
+            }
+
+            .pricing-card-featured {
+              border-color: rgba(255, 215, 0, 0.5);
+              background: rgba(255, 215, 0, 0.05);
+              transform: scale(1.05);
+            }
+
+            .pricing-card-featured::before {
+              opacity: 1;
+            }
+
+            .featured-badge {
+              position: absolute;
+              top: 20px;
+              right: -35px;
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              color: #0a0a0a;
+              padding: 0.5rem 3rem;
+              font-size: 0.75rem;
+              font-weight: 700;
+              letter-spacing: 1px;
+              transform: rotate(45deg);
+              box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+            }
+
+            .pricing-header {
+              margin-bottom: 2rem;
+            }
+
+            .pricing-tier {
+              font-family: 'Orbitron', monospace;
+              font-size: 1.8rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 1.5rem;
+            }
+
+            .pricing-amount {
+              display: flex;
+              align-items: baseline;
+              justify-content: center;
+              gap: 0.3rem;
+            }
+
+            .currency {
+              font-size: 1.5rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .price {
+              font-size: 4rem;
+              font-weight: 700;
+              color: #ffffff;
+            }
+
+            .period {
+              font-size: 1.2rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .pricing-features {
+              list-style: none;
+              text-align: left;
+              margin: 2.5rem 0;
+            }
+
+            .pricing-features li {
+              padding: 0.8rem 0;
+              color: rgba(255, 255, 255, 0.8);
+              font-size: 1rem;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            .pricing-features li:last-child {
+              border-bottom: none;
+            }
+
+            .pricing-button {
+              width: 100%;
+              padding: 1rem 2rem;
+              border-radius: 15px;
+              font-size: 1rem;
+              font-weight: 700;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin-top: 1rem;
+            }
+
+            .pricing-button-starter {
+              background: rgba(255, 255, 255, 0.1);
+              border: 2px solid rgba(255, 255, 255, 0.2);
+              color: #ffffff;
+            }
+
+            .pricing-button-starter:hover {
+              background: rgba(255, 255, 255, 0.15);
+              transform: translateY(-2px);
+            }
+
+            .pricing-button-pro {
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border: none;
+              color: #0a0a0a;
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.4);
+            }
+
+            .pricing-button-pro:hover {
+              transform: translateY(-3px);
+              box-shadow: 0 12px 40px rgba(255, 215, 0, 0.6);
+            }
+
+            .pricing-button-enterprise {
+              background: rgba(255, 255, 255, 0.1);
+              border: 2px solid rgba(255, 215, 0, 0.3);
+              color: #FFD700;
+            }
+
+            .pricing-button-enterprise:hover {
+              background: rgba(255, 215, 0, 0.1);
+              transform: translateY(-2px);
+            }
+
+            /* About Us Page */
+            .about-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 4rem 2rem;
+            }
+
+            .about-hero {
+              text-align: center;
+              margin-bottom: 4rem;
+            }
+
+            .about-tagline {
+              font-size: 1.4rem;
+              color: rgba(255, 255, 255, 0.7);
+              margin-top: 1rem;
+            }
+
+            .about-section {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 4rem;
+              margin-bottom: 6rem;
+            }
+
+            .about-text {
+              flex: 1;
+              max-width: 600px;
+            }
+
+            .about-heading {
+              font-family: 'Orbitron', monospace;
+              font-size: 2rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 1.5rem;
+            }
+
+            .about-paragraph {
+              font-size: 1.1rem;
+              line-height: 1.8;
+              color: rgba(255, 255, 255, 0.8);
+            }
+
+            .values-section {
+              margin-bottom: 6rem;
+            }
+
+            .values-section .about-heading {
+              text-align: center;
+              margin-bottom: 3rem;
+            }
+
+            .values-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 2rem;
+            }
+
+            .value-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              padding: 2.5rem 1.5rem;
+              border-radius: 20px;
+              text-align: center;
+              transition: all 0.3s ease;
+            }
+
+            .value-card:hover {
+              background: rgba(255, 215, 0, 0.05);
+              border-color: rgba(255, 215, 0, 0.3);
+              transform: translateY(-5px);
+            }
+
+            .value-icon {
+              font-size: 3rem;
+              margin-bottom: 1.5rem;
+            }
+
+            .value-title {
+              font-size: 1.3rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 1rem;
+            }
+
+            .value-description {
+              font-size: 0.95rem;
+              line-height: 1.6;
+              color: rgba(255, 255, 255, 0.7);
+            }
+
+            .stats-section {
+              margin-bottom: 6rem;
+            }
+
+            .stats-section .about-heading {
+              text-align: center;
+              margin-bottom: 3rem;
+            }
+
+            .impact-stats {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 3rem;
+            }
+
+            .impact-stat {
+              text-align: center;
+              padding: 2rem;
+              background: rgba(255, 215, 0, 0.05);
+              border: 1px solid rgba(255, 215, 0, 0.2);
+              border-radius: 20px;
+              transition: all 0.3s ease;
+            }
+
+            .impact-stat:hover {
+              background: rgba(255, 215, 0, 0.1);
+              transform: translateY(-5px);
+              box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+            }
+
+            .impact-number {
+              font-family: 'Orbitron', monospace;
+              font-size: 3rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.5rem;
+            }
+
+            .impact-label {
+              font-size: 1rem;
+              color: rgba(255, 255, 255, 0.7);
+            }
+
+            .cta-section {
+              text-align: center;
+              padding: 4rem 2rem;
+              background: rgba(255, 215, 0, 0.05);
+              border: 1px solid rgba(255, 215, 0, 0.2);
+              border-radius: 30px;
+            }
+
+            .cta-heading {
+              font-family: 'Orbitron', monospace;
+              font-size: 2rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 2rem;
+            }
+
+            /* Dashboard Page */
+            .dashboard-nav {
+              background: rgba(10, 10, 10, 0.95);
+              backdrop-filter: blur(20px);
+              border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+            }
+
+            .user-profile {
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              background: rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .user-avatar {
+              font-size: 1.2rem;
+            }
+
+            .dashboard-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 3rem 2rem;
+            }
+
+            .dashboard-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 4rem;
+              padding: 2rem;
+              background: rgba(255, 215, 0, 0.05);
+              border: 1px solid rgba(255, 215, 0, 0.2);
+              border-radius: 20px;
+              flex-wrap: wrap;
+              gap: 2rem;
+            }
+
+            .welcome-section {
+              flex: 1;
+            }
+
+            .dashboard-title {
+              font-family: 'Orbitron', monospace;
+              font-size: 2.5rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.5rem;
+            }
+
+            .dashboard-subtitle {
+              font-size: 1.1rem;
+              color: rgba(255, 255, 255, 0.7);
+            }
+
+            .dashboard-stats-mini {
+              display: flex;
+              gap: 2rem;
+            }
+
+            .mini-stat {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              padding: 1rem 1.5rem;
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 15px;
+            }
+
+            .mini-stat-icon {
+              font-size: 2rem;
+            }
+
+            .mini-stat-value {
+              font-size: 1.8rem;
+              font-weight: 700;
+              color: #FFD700;
+            }
+
+            .mini-stat-label {
+              font-size: 0.85rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .dashboard-section {
+              margin-bottom: 4rem;
+            }
+
+            .section-heading {
+              font-family: 'Orbitron', monospace;
+              font-size: 1.8rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 2rem;
+            }
+
+            .courses-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+              gap: 2rem;
+            }
+
+            .course-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 20px;
+              overflow: hidden;
+              transition: all 0.3s ease;
+              cursor: pointer;
+            }
+
+            .course-card:hover {
+              transform: translateY(-5px);
+              border-color: rgba(255, 215, 0, 0.4);
+              box-shadow: 0 10px 40px rgba(255, 215, 0, 0.2);
+            }
+
+            .course-thumbnail {
+              width: 100%;
+              height: 180px;
+              background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 4rem;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .course-info {
+              padding: 1.5rem;
+            }
+
+            .course-category {
+              display: inline-block;
+              padding: 0.3rem 0.8rem;
+              background: rgba(255, 215, 0, 0.1);
+              border: 1px solid rgba(255, 215, 0, 0.3);
+              border-radius: 20px;
+              font-size: 0.75rem;
+              font-weight: 600;
+              color: #FFD700;
+              margin-bottom: 0.8rem;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+
+            .course-title {
+              font-size: 1.2rem;
+              font-weight: 700;
+              color: #ffffff;
+              margin-bottom: 0.5rem;
+              line-height: 1.4;
+            }
+
+            .course-instructor {
+              font-size: 0.9rem;
+              color: rgba(255, 255, 255, 0.6);
+              margin-bottom: 1rem;
+            }
+
+            .course-progress-section {
+              margin-bottom: 1.5rem;
+            }
+
+            .progress-bar-container {
+              width: 100%;
+              height: 8px;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              overflow: hidden;
+              margin-bottom: 0.5rem;
+            }
+
+            .progress-bar {
+              height: 100%;
+              background: linear-gradient(90deg, #FFD700 0%, #FFA500 100%);
+              border-radius: 10px;
+              transition: width 0.5s ease;
+            }
+
+            .progress-text {
+              font-size: 0.85rem;
+              color: rgba(255, 255, 255, 0.7);
+            }
+
+            .course-meta {
+              display: flex;
+              gap: 1rem;
+              margin-bottom: 1rem;
+            }
+
+            .course-duration {
+              font-size: 0.9rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .course-actions {
+              display: flex;
+              gap: 0.8rem;
+            }
+
+            .btn-primary {
+              flex: 1;
+              padding: 0.8rem 1.5rem;
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border: none;
+              color: #0a0a0a;
+              border-radius: 10px;
+              font-weight: 700;
+              font-size: 0.9rem;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+
+            .btn-primary:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+            }
+
+            .btn-secondary {
+              padding: 0.8rem 1.5rem;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              color: #ffffff;
+              border-radius: 10px;
+              font-weight: 600;
+              font-size: 0.9rem;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            }
+
+            .btn-secondary:hover {
+              background: rgba(255, 255, 255, 0.1);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .achievements-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+              gap: 2rem;
+            }
+
+            .achievement-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 215, 0, 0.3);
+              border-radius: 20px;
+              padding: 2rem;
+              text-align: center;
+              transition: all 0.3s ease;
+            }
+
+            .achievement-card:hover {
+              transform: translateY(-5px);
+              background: rgba(255, 215, 0, 0.05);
+              box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2);
+            }
+
+            .achievement-card.locked {
+              opacity: 0.5;
+              border-color: rgba(255, 255, 255, 0.1);
+            }
+
+            .achievement-card.locked:hover {
+              transform: none;
+              background: rgba(255, 255, 255, 0.03);
+              box-shadow: none;
+            }
+
+            .achievement-icon {
+              font-size: 3.5rem;
+              margin-bottom: 1rem;
+            }
+
+            .achievement-title {
+              font-size: 1.2rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.5rem;
+            }
+
+            .achievement-desc {
+              font-size: 0.9rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            /* Search and Filter */
+            .search-filter-section {
+              margin-bottom: 3rem;
+              display: flex;
+              gap: 2rem;
+              align-items: center;
+              flex-wrap: wrap;
+            }
+
+            .search-box {
+              flex: 1;
+              min-width: 300px;
+              position: relative;
+              display: flex;
+              align-items: center;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 15px;
+              padding: 0.8rem 1.5rem;
+            }
+
+            .search-icon {
+              font-size: 1.2rem;
+              margin-right: 0.8rem;
+            }
+
+            .search-input {
+              flex: 1;
+              background: transparent;
+              border: none;
+              color: #ffffff;
+              font-size: 1rem;
+              outline: none;
+              font-family: 'Space Grotesk', sans-serif;
+            }
+
+            .search-input::placeholder {
+              color: rgba(255, 255, 255, 0.5);
+            }
+
+            .filter-buttons {
+              display: flex;
+              gap: 0.8rem;
+              flex-wrap: wrap;
+            }
+
+            .filter-btn {
+              padding: 0.7rem 1.5rem;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              border-radius: 20px;
+              font-size: 0.9rem;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            }
+
+            .filter-btn:hover {
+              background: rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .filter-btn.active {
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border-color: transparent;
+              color: #0a0a0a;
+            }
+
+            /* Course Player Page */
+            .course-player-layout {
+              display: grid;
+              grid-template-columns: 1fr 400px;
+              gap: 0;
+              max-width: 1800px;
+              margin: 0 auto;
+              min-height: calc(100vh - 100px);
+            }
+
+            .video-section {
+              background: #0a0a0a;
+            }
+
+            .video-player {
+              width: 100%;
+              aspect-ratio: 16/9;
+              background: #000000;
+              position: relative;
+            }
+
+            .video-placeholder {
+              width: 100%;
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.1) 100%);
+            }
+
+            .play-button {
+              width: 100px;
+              height: 100px;
+              background: rgba(255, 215, 0, 0.9);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 3rem;
+              color: #0a0a0a;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            }
+
+            .play-button:hover {
+              transform: scale(1.1);
+              background: #FFD700;
+            }
+
+            .video-info {
+              padding: 2rem;
+            }
+
+            .video-title {
+              font-size: 2rem;
+              font-weight: 700;
+              color: #ffffff;
+              margin-bottom: 0.5rem;
+            }
+
+            .video-instructor {
+              font-size: 1rem;
+              color: rgba(255, 255, 255, 0.6);
+              margin-bottom: 2rem;
+            }
+
+            .video-tabs {
+              display: flex;
+              gap: 1rem;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+              margin-bottom: 2rem;
+            }
+
+            .video-tab {
+              padding: 1rem 1.5rem;
+              background: transparent;
+              border: none;
+              color: rgba(255, 255, 255, 0.6);
+              font-size: 1rem;
+              font-weight: 600;
+              cursor: pointer;
+              border-bottom: 3px solid transparent;
+              transition: all 0.3s ease;
+            }
+
+            .video-tab.active {
+              color: #FFD700;
+              border-bottom-color: #FFD700;
+            }
+
+            .video-tab:hover {
+              color: #ffffff;
+            }
+
+            .video-description h3 {
+              font-size: 1.3rem;
+              color: #FFD700;
+              margin-bottom: 1rem;
+            }
+
+            .video-description p {
+              color: rgba(255, 255, 255, 0.8);
+              line-height: 1.8;
+              margin-bottom: 2rem;
+            }
+
+            .learning-objectives {
+              list-style: none;
+              padding: 0;
+            }
+
+            .learning-objectives li {
+              color: rgba(255, 255, 255, 0.8);
+              padding: 0.5rem 0;
+              font-size: 1rem;
+            }
+
+            .curriculum-sidebar {
+              background: rgba(10, 10, 10, 0.95);
+              border-left: 1px solid rgba(255, 255, 255, 0.1);
+              padding: 2rem;
+              overflow-y: auto;
+              max-height: calc(100vh - 100px);
+            }
+
+            .curriculum-header h3 {
+              font-size: 1.5rem;
+              color: #FFD700;
+              margin-bottom: 1rem;
+            }
+
+            .curriculum-progress {
+              margin-bottom: 2rem;
+            }
+
+            .curriculum-progress span {
+              display: block;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 0.5rem;
+              font-size: 0.9rem;
+            }
+
+            .lessons-list {
+              margin-bottom: 2rem;
+            }
+
+            .lesson-item {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              padding: 1rem;
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              margin-bottom: 0.8rem;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            }
+
+            .lesson-item:hover {
+              background: rgba(255, 255, 255, 0.05);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .lesson-item.completed {
+              opacity: 0.7;
+            }
+
+            .lesson-item.current {
+              background: rgba(255, 215, 0, 0.1);
+              border-color: rgba(255, 215, 0, 0.5);
+            }
+
+            .lesson-number {
+              width: 30px;
+              height: 30px;
+              background: rgba(255, 215, 0, 0.2);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 700;
+              color: #FFD700;
+              font-size: 0.9rem;
+            }
+
+            .lesson-details {
+              flex: 1;
+            }
+
+            .lesson-title {
+              font-size: 0.95rem;
+              color: #ffffff;
+              margin-bottom: 0.3rem;
+            }
+
+            .lesson-duration {
+              font-size: 0.8rem;
+              color: rgba(255, 255, 255, 0.5);
+            }
+
+            .lesson-status {
+              font-size: 1.2rem;
+              color: #FFD700;
+            }
+
+            .curriculum-actions {
+              display: flex;
+              flex-direction: column;
+              gap: 0.8rem;
+            }
+
+            /* Profile Page */
+            .profile-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 3rem 2rem;
+            }
+
+            .profile-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 2rem;
+            }
+
+            .profile-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 20px;
+              padding: 2rem;
+            }
+
+            .profile-section-title {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 1.5rem;
+            }
+
+            .profile-avatar-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 1rem;
+              margin-bottom: 2rem;
+            }
+
+            .profile-avatar-large {
+              width: 120px;
+              height: 120px;
+              background: linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 165, 0, 0.2) 100%);
+              border: 3px solid rgba(255, 215, 0, 0.5);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 4rem;
+            }
+
+            .form-group {
+              margin-bottom: 1.5rem;
+            }
+
+            .form-group label {
+              display: block;
+              color: rgba(255, 255, 255, 0.9);
+              font-weight: 600;
+              margin-bottom: 0.5rem;
+              font-size: 0.95rem;
+            }
+
+            .form-input {
+              width: 100%;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 0.9rem 1.2rem;
+              border-radius: 10px;
+              font-size: 1rem;
+              transition: all 0.3s ease;
+              font-family: 'Space Grotesk', sans-serif;
+            }
+
+            .form-input:focus {
+              outline: none;
+              border-color: rgba(255, 215, 0, 0.5);
+              background: rgba(255, 255, 255, 0.08);
+            }
+
+            .form-textarea {
+              width: 100%;
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              color: #ffffff;
+              padding: 0.9rem 1.2rem;
+              border-radius: 10px;
+              font-size: 1rem;
+              resize: vertical;
+              font-family: 'Space Grotesk', sans-serif;
+            }
+
+            .form-textarea:focus {
+              outline: none;
+              border-color: rgba(255, 215, 0, 0.5);
+              background: rgba(255, 255, 255, 0.08);
+            }
+
+            .checkbox-group {
+              display: flex;
+              flex-direction: column;
+              gap: 0.8rem;
+            }
+
+            .checkbox-label {
+              display: flex;
+              align-items: center;
+              gap: 0.8rem;
+              color: rgba(255, 255, 255, 0.8);
+              cursor: pointer;
+            }
+
+            .checkbox-label input[type="checkbox"] {
+              width: 18px;
+              height: 18px;
+              cursor: pointer;
+            }
+
+            .toggle-label {
+              display: flex;
+              align-items: center;
+              gap: 1rem;
+              color: rgba(255, 255, 255, 0.8);
+              margin-bottom: 1rem;
+              cursor: pointer;
+            }
+
+            .toggle-label input[type="checkbox"] {
+              width: 20px;
+              height: 20px;
+              cursor: pointer;
+            }
+
+            .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 1.5rem;
+            }
+
+            .stat-box {
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 15px;
+              padding: 1.5rem;
+              text-align: center;
+              transition: all 0.3s ease;
+            }
+
+            .stat-box:hover {
+              background: rgba(255, 215, 0, 0.05);
+              border-color: rgba(255, 215, 0, 0.3);
+            }
+
+            .stat-icon {
+              font-size: 2.5rem;
+              margin-bottom: 0.5rem;
+            }
+
+            .stat-value {
+              font-size: 2rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.3rem;
+            }
+
+            .stat-label {
+              font-size: 0.85rem;
+              color: rgba(255, 255, 255, 0.6);
+            }
+
+            .btn-danger {
+              width: 100%;
+              padding: 0.9rem 2rem;
+              background: rgba(255, 50, 50, 0.2);
+              border: 1px solid rgba(255, 50, 50, 0.5);
+              color: #ff5050;
+              border-radius: 10px;
+              font-weight: 700;
+              font-size: 0.9rem;
+              cursor: pointer;
+              transition: all 0.3s ease;
+              margin-top: 1rem;
+            }
+
+            .btn-danger:hover {
+              background: rgba(255, 50, 50, 0.3);
+              border-color: rgba(255, 50, 50, 0.7);
+            }
+
+            /* Certificates Page */
+            .certificates-content {
+              max-width: 1400px;
+              margin: 0 auto;
+              padding: 3rem 2rem;
+            }
+
+            .certificates-subtitle {
+              text-align: center;
+              font-size: 1.1rem;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 4rem;
+            }
+
+            .certificates-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+              gap: 2rem;
+              margin-bottom: 4rem;
+            }
+
+            .certificate-card {
+              background: rgba(255, 255, 255, 0.03);
+              border: 2px solid rgba(255, 215, 0, 0.3);
+              border-radius: 20px;
+              padding: 2.5rem;
+              display: flex;
+              flex-direction: column;
+              gap: 1.5rem;
+              transition: all 0.3s ease;
+            }
+
+            .certificate-card:hover {
+              transform: translateY(-5px);
+              border-color: rgba(255, 215, 0, 0.6);
+              box-shadow: 0 15px 50px rgba(255, 215, 0, 0.2);
+            }
+
+            .certificate-badge {
+              display: flex;
+              justify-content: center;
+            }
+
+            .badge-icon {
+              width: 80px;
+              height: 80px;
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 3rem;
+              box-shadow: 0 8px 30px rgba(255, 215, 0, 0.4);
+            }
+
+            .certificate-content {
+              text-align: center;
+            }
+
+            .certificate-course {
+              font-size: 1.5rem;
+              font-weight: 700;
+              color: #FFD700;
+              margin-bottom: 0.8rem;
+            }
+
+            .certificate-instructor,
+            .certificate-date,
+            .certificate-id {
+              font-size: 0.95rem;
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 0.5rem;
+            }
+
+            .certificate-actions {
+              display: flex;
+              gap: 0.8rem;
+            }
+
+            .certificate-actions .btn-primary,
+            .certificate-actions .btn-secondary {
+              flex: 1;
+            }
+
+            .certificates-empty {
+              text-align: center;
+              padding: 4rem 2rem;
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 20px;
+            }
+
+            .empty-icon {
+              font-size: 5rem;
+              margin-bottom: 1.5rem;
+              opacity: 0.5;
+            }
+
+            .certificates-empty h3 {
+              font-size: 1.5rem;
+              color: #FFD700;
+              margin-bottom: 1rem;
+            }
+
+            .certificates-empty p {
+              color: rgba(255, 255, 255, 0.7);
+              margin-bottom: 2rem;
+            }
+
+            /* Responsive Design */
+            @media (max-width: 1200px) {
+              .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+              }
+            }
+
+            @media (max-width: 768px) {
+              .nav-container {
+                gap: 1rem;
+              }
+
+              .nav-link {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.85rem;
+              }
+
+              .hero-title {
+                font-size: 2.5rem;
+              }
+
+              .landing-content {
+                flex-direction: column;
+                text-align: center;
+              }
+
+              .honeycomb-pattern {
+                width: 300px;
+                height: 300px;
+              }
+
+              .services-grid {
+                grid-template-columns: repeat(2, 1fr);
+              }
+
+              .features-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .auth-content {
+                flex-direction: column;
+              }
+
+              .motto {
+                flex-wrap: wrap;
+                font-size: 1.5rem;
+              }
+
+              .pricing-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .pricing-card-featured {
+                transform: scale(1);
+              }
+
+              .values-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .impact-stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1.5rem;
+              }
+
+              .about-section {
+                flex-direction: column;
+              }
+
+              .dashboard-header {
+                flex-direction: column;
+                text-align: center;
+              }
+
+              .dashboard-stats-mini {
+                flex-direction: column;
+                width: 100%;
+              }
+
+              .mini-stat {
+                justify-content: center;
+              }
+
+              .courses-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .achievements-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .search-filter-section {
+                flex-direction: column;
+              }
+
+              .search-box {
+                width: 100%;
+              }
+
+              .filter-buttons {
+                width: 100%;
+                justify-content: center;
+              }
+
+              .course-player-layout {
+                grid-template-columns: 1fr;
+              }
+
+              .curriculum-sidebar {
+                max-height: none;
+                border-left: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+              }
+
+              .profile-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .certificates-grid {
+                grid-template-columns: 1fr;
+              }
+            }
+          `}</style>
+
+          <div className="app">
+            {currentPage === 'landing' && <LandingPage />}
+            {currentPage === 'services' && <ServicesPage />}
+            {currentPage === 'features' && <FeaturesPage />}
+            {currentPage === 'signup' && <SignUpPage />}
+            {currentPage === 'signin' && <SignInPage />}
+            {currentPage === 'prices' && <PricesPage />}
+            {currentPage === 'about' && <AboutUsPage />}
+            {currentPage === 'dashboard' && <DashboardPage />}
+            {currentPage === 'course-player' && <CoursePlayerPage />}
+            {currentPage === 'profile' && <ProfilePage />}
+            {currentPage === 'certificates' && <CertificatesPage />}
+          </div>
+        </>
+      );
+    }
+
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<BeeHivePlatform />);
+  </script>
+</body>
+</html>
